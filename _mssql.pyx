@@ -1714,11 +1714,11 @@ cdef _quote_simple_value(value, charset='utf8'):
         if value[0:2] == b'0x':
             return value
 
-        # see if it can be decoded as ascii if there are no null bytes
+        # try to decode with default encoding if there are no null bytes
         if b'\0' not in value:
             try:
-                value.decode('ascii')
-                return b"'" + value.replace(b"'", b"''") + b"'"
+                value = unicode(value)
+                return b"'" + value.replace(b"'", b"''").encode(charset) + b"'"
             except UnicodeDecodeError:
                 pass
 
