@@ -3,26 +3,24 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-====================
-pymssql Introduction
-====================
+=======
+pymssql
+=======
 
 .. image:: https://travis-ci.org/pymssql/pymssql.png?branch=master
         :target: https://travis-ci.org/pymssql/pymssql
 
-.. image:: https://pypip.in/d/pymssql/badge.png
-        :target: https://crate.io/packages/pymssql
+.. image:: http://img.shields.io/pypi/dm/pymssql.svg
+        :target: https://pypi.python.org/pypi/pymssql/
 
-.. image:: https://pypip.in/v/pymssql/badge.png
-        :target: https://crate.io/packages/pymssql
+.. image:: http://img.shields.io/pypi/v/pymssql.svg
+        :target: https://pypi.python.org/pypi/pymssql/
 
-A simple database interface to `Microsoft SQL Server`_ (MS-SQL) for `Python`_
-that builds on top of `FreeTDS`_ to provide a Python DB-API (`PEP-249`_)
-interface to *SQL Server*.
+A simple database interface for `Python`_ that builds on top of `FreeTDS`_ to
+provide a Python DB-API (`PEP-249`_) interface to `Microsoft SQL Server`_.
 
-
-The 2.x branch of pymssql is built on the latest release of FreeTDS which 
-**removes many of the limitations** found with older FreeTDS versions and 
+The 2.x branch of pymssql is built on the latest release of FreeTDS which
+**removes many of the limitations** found with older FreeTDS versions and
 the 1.x branch.
 
 Resources
@@ -33,10 +31,10 @@ Resources
 
   * Quick Start: coming soon :)
   * `FAQ & Troubleshooting`_
- 
+
 * `PYPI Project`_
 * GitHub_
-* Discussion_ 
+* Discussion_
 * `FreeTDS User Guide`_
 
 Features
@@ -50,6 +48,8 @@ Features
   can use instead of the DB-API
 * Supports stored procedures with both return values and output parameters
 * A comprehensive test suite
+* Compatible with cooperative multi-tasking systems (gevent, etc.)
+* Can be used to connect to Azure
 
 License
 -------
@@ -63,16 +63,22 @@ Can you take a minute and fill out this survey to help us prioritize development
 
 https://www.surveymonkey.com/s/KMQ8BM5
 
+Survey Results
+^^^^^^^^^^^^^^
+
+* Excel (.xls) -- http://cl.ly/1R0m2B342I0k/download/SurveySummary_04092014.xls
+* PDF -- http://cl.ly/2P3o1N1K2h3p/download/Data_All_140409.pdf
+
 Recent Changes
 --------------
 
 <Need to import>
 
 .. _Docs & Project Home: http://pymssql.org
-.. _Microsoft SQL Server: http://www.microsoft.com/sqlserver/
 .. _Python: http://www.python.org/
-.. _PEP-249: http://www.python.org/dev/peps/pep-0249/
 .. _FreeTDS: http://www.freetds.org/
+.. _PEP-249: http://www.python.org/dev/peps/pep-0249/
+.. _Microsoft SQL Server: http://www.microsoft.com/sqlserver/
 .. _Cython: http://cython.org
 .. _FAQ & Troubleshooting: http://pymssql.org/faq.html
 .. _PYPI Project: https://pypi.python.org/pypi/pymssql/
@@ -81,8 +87,8 @@ Recent Changes
 .. _Discussion: https://groups.google.com/forum/?fromgroups#!forum/pymssql
 
 
-Documentation 
-=============
+Documentation
+-------------
 
 .. toctree::
    :maxdepth: 2
@@ -98,12 +104,11 @@ Documentation
    faq
    building_and_developing
    freetds_and_dates
-   todo
    changelog
-   history
+   todo
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

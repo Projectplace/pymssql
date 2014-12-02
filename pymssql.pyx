@@ -20,15 +20,19 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA  02110-1301  USA
 
+import datetime
+import time
+
 import _mssql
 cimport _mssql
-from cpython cimport bool
+from cpython cimport bool, PY_MAJOR_VERSION
 
 cdef extern from "pymssql_version.h":
     const char *PYMSSQL_VERSION
 
 __author__ = 'Damien Churchill <damoxc@gmail.com>'
-__version__ = PYMSSQL_VERSION.decode('ascii')
+__full_version__ = PYMSSQL_VERSION.decode('ascii')
+__version__ = '.'.join(__full_version__.split('.')[:3]) # drop '.dev' from 'X.Y.Z.dev'
 
 # Strives for compliance with DB-API 2.0 (PEP 249)
 # http://www.python.org/dev/peps/pep-0249/
@@ -84,18 +88,38 @@ NUMBER = DBAPIType(_mssql.NUMBER)
 DATETIME = DBAPIType(_mssql.DATETIME)
 DECIMAL = DBAPIType(_mssql.DECIMAL)
 
+Date = datetime.date
+Time = datetime.time
+Timestamp = datetime.datetime
+DateFromTicks = lambda ticks: Date(*time.localtime(ticks)[:3])
+TimeFromTicks = lambda ticks: Time(*time.localtime(ticks)[3:6])
+TimestampFromTicks = lambda ticks: Timestamp(*time.localtime(ticks)[:6])
+Binary = bytes
+
 cdef dict DBTYPES = {
     'bool': _mssql.SQLBITN,
     'str': _mssql.SQLVARCHAR,
     'unicode': _mssql.SQLVARCHAR,
-    'int': _mssql.SQLINTN,
-    'long': _mssql.SQLINT8,
     'Decimal': _mssql.SQLDECIMAL,
     'datetime': _mssql.SQLDATETIME,
     'date': _mssql.SQLDATETIME,
     #Dump type for work vith None
     'NoneType': _mssql.SQLVARCHAR,
 }
+
+cdef int py2db_type(py_type, value):
+    if PY_MAJOR_VERSION == 3:
+        if py_type == 'int':
+            if value is not None and value >= -2147483648 and value <= 2147483647:  # -2^31 - 2^31-1
+                return _mssql.SQLINTN
+            else:
+                return _mssql.SQLINT8
+    else:
+        if py_type == 'int':
+            return _mssql.SQLINTN
+        if py_type == 'long':
+            return _mssql.SQLINT8
+    return DBTYPES[py_type]
 
 try:
     StandardError
@@ -211,14 +235,16 @@ cdef class Connection:
                 raise InterfaceError('Connection is closed.')
             return self.conn
 
-    def __init__(self, conn, as_dict):
+    def __init__(self, conn, as_dict, autocommit):
         self.conn = conn
-        self._autocommit = False
+        self._autocommit = autocommit
         self.as_dict = as_dict
-        try:
-            self._conn.execute_non_query('BEGIN TRAN')
-        except Exception, e:
-            raise OperationalError('Cannot start transaction: ' + str(e.args[0]))
+
+        if not autocommit:
+            try:
+                self._conn.execute_non_query('BEGIN TRAN')
+            except Exception, e:
+                raise OperationalError('Cannot start transaction: ' + str(e.args[0]))
 
     def __dealloc__(self):
         if self.conn:
@@ -234,6 +260,7 @@ cdef class Connection:
 
         tran_type = 'ROLLBACK' if status else 'BEGIN'
         self._conn.execute_non_query('%s TRAN' % tran_type)
+
         self._autocommit = status
 
     def __enter__(self):
@@ -391,12 +418,15 @@ cdef class Cursor:
 
             try:
                 type_name = param_type.__name__
-                db_type = DBTYPES[type_name]
+                db_type = py2db_type(type_name, param_value)
             except (AttributeError, KeyError):
                 raise NotSupportedError('Unable to determine database type from python %s type' % type_name)
 
             proc.bind(param_value, db_type, output=param_output)
-        self._returnvalue = proc.execute()
+        try:
+            self._returnvalue = proc.execute()
+        except _mssql.MSSQLDatabaseException, e:
+            raise DatabaseError, e.args[0]
         return tuple([proc.parameters[p] for p in proc.parameters])
 
     def close(self):
@@ -461,7 +491,7 @@ cdef class Cursor:
     cdef getrow(self):
         """
         Helper method used by fetchone and fetchmany to fetch and handle
-        converting the row if as_dict = False.
+        converting the row if as_dict = True.
         """
         row_format = _mssql.ROW_FORMAT_DICT if self.as_dict else _mssql.ROW_FORMAT_TUPLE
         row = next(self._source._conn.get_iterator(row_format))
@@ -547,7 +577,7 @@ cdef class Cursor:
 
 def connect(server='.', user='', password='', database='', timeout=0,
         login_timeout=60, charset='UTF-8', as_dict=False,
-        host='', appname=None, port='1433'):
+        host='', appname=None, port='1433', conn_properties=None, autocommit=False):
     """
     Constructor for creating a connection to the database. Returns a
     Connection object.
@@ -571,7 +601,12 @@ def connect(server='.', user='', password='', database='', timeout=0,
     :keyword appname: Set the application name to use for the connection
     :type appname: string
     :keyword port: the TCP port to use to connect to the server
-    :type appname: string
+    :type port: string
+    :keyword conn_properties: SQL queries to send to the server upon connection
+                              establishment. Can be a string or another kind
+                              of iterable of strings
+    :keyword autocommit whether to use default autocommiting mode or not
+    :type autocommit: boolean
     """
 
     _mssql.login_timeout = login_timeout
@@ -592,8 +627,10 @@ def connect(server='.', user='', password='', database='', timeout=0,
         server = host
 
     try:
-        conn = _mssql.connect(server, user, password, charset, database,
-            appname, port)
+        conn = _mssql.connect(server=server, user=user, password=password,
+                              charset=charset, database=database,
+                              appname=appname, port=port,
+                              conn_properties=conn_properties)
 
     except _mssql.MSSQLDatabaseException, e:
         raise OperationalError(e.args[0])
@@ -605,7 +642,7 @@ def connect(server='.', user='', password='', database='', timeout=0,
     if timeout != 0:
         conn.query_timeout = timeout
 
-    return Connection(conn, as_dict)
+    return Connection(conn, as_dict, autocommit)
 
 def get_max_connections():
     """

@@ -12,6 +12,14 @@ The pymssql package consists of two modules:
 * :mod:`_mssql` -- use it if you care about performance and ease of use
   (``_mssql`` module is easier to use than ``pymssql``).
 
+Supported related software
+==========================
+
+:Python: Python 2.x: 2.6 or newer. Python 3.x: 3.3 or newer.
+:FreeTDS: 0.82 or newer.
+:Cython: 0.15 or newer.
+:Microsoft SQL Server: 2005 or newer.
+
 Project Discussion
 ==================
 
@@ -55,12 +63,3 @@ We would be happy to have:
 * Help from the community with maintenance of this documentation.
 
 If interested, please connect with us on the mailing list.
-
-.. seealso::
-
-  `PYPI Page`_, recent changelog, and Downloads
-
-  `FreeTDS User Guide`_
-
-.. _PYPI Page: https://pypi.python.org/pypi/pymssql/
-.. _FreeTDS User Guide: http://www.freetds.org/userguide/
