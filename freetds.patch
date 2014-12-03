@@ -1,0 +1,89 @@
+diff -rupN freetds-0.91/src/replacements/iconv.c freetds-0.91+pp/src/replacements/iconv.c
+--- freetds-0.91/src/replacements/iconv.c	2014-12-03 09:30:56.064026000 +0100
++++ freetds-0.91+pp/src/replacements/iconv.c	2014-12-04 15:47:33.720026000 +0100
+@@ -110,48 +110,34 @@ get_utf8(const unsigned char *p, size_t
+ static int
+ put_utf8(unsigned char *buf, size_t buf_len, ICONV_CHAR c)
+ {
+-#define MASK(n) ((0xffffffffu << (n)) & 0xffffffffu)
+ 	size_t o_len;
+-	unsigned mask;
++	int i;
+ 
+-	if ((c & MASK(7)) == 0) {
++	if (c < 0x80) {
+ 		if (buf_len < 1)
+ 			return -E2BIG;
+-		*buf = (unsigned char) c;
++		*buf = c;
+ 		return 1;
+ 	}
+ 
+-	o_len = 2;
+-	for (;;) {
+-		if ((c & MASK(11)) == 0)
+-			break;
+-		++o_len;
+-		if ((c & MASK(16)) == 0)
+-			break;
+-		++o_len;
+-		if ((c & MASK(21)) == 0)
+-			break;
+-		++o_len;
+-		if ((c & MASK(26)) == 0)
+-			break;
+-		++o_len;
+-		if ((c & MASK(31)) != 0)
+-			return -EINVAL;
+-	}
++	if (c <= 0x7ff)
++		o_len = 2;
++	else if (c <= 0xffff)
++		o_len = 3;
++	else if (c <= 0x10ffff)
++		o_len = 4;
++	else
++		return -EINVAL;
+ 
+ 	if (buf_len < o_len)
+ 		return -E2BIG;
++
+ 	buf += o_len;
+-	mask = 0xff80;
+-	for (;;) {
++	for (i = 1; i < o_len; i++) {
+ 		*--buf = 0x80 | (c & 0x3f);
+ 		c >>= 6;
+-		mask >>= 1;
+-		if (c < 0x40) {
+-			*--buf = mask | c;
+-			break;
+-		}
+ 	}
++	*--buf = c | (0xff00 >> o_len);
+ 	return o_len;
+ }
+ 
+diff -rupN freetds-0.91/src/tds/encodings.h freetds-0.91+pp/src/tds/encodings.h
+--- freetds-0.91/src/tds/encodings.h	2014-12-03 09:30:56.544026000 +0100
++++ freetds-0.91+pp/src/tds/encodings.h	2014-12-03 17:01:43.724026000 +0100
+@@ -539,8 +539,8 @@ static const CHARACTER_SET_ALIAS sybase_
+ enum {
+ 	        TDS_CHARSET_ISO_8859_1 =   0,
+ 	             TDS_CHARSET_UTF_8 =   1,
+-	           TDS_CHARSET_UCS_2LE =   2,
+-	           TDS_CHARSET_UCS_2BE =   3,
++	           TDS_CHARSET_UCS_2LE =   97,
++	           TDS_CHARSET_UCS_2BE =   96,
+ 	         TDS_CHARSET_ARMSCII_8 =   4,
+ 	             TDS_CHARSET_BIG_5 =   5,
+ 	        TDS_CHARSET_BIG5_HKSCS =   6,
+@@ -623,7 +623,7 @@ enum {
+ 	            TDS_CHARSET_ROMAN8 =  83,
+ 	              TDS_CHARSET_SJIS =  84,
+ 	              TDS_CHARSET_TCVN =  85,
+-	             TDS_CHARSET_UCS_2 =  86,
++	             TDS_CHARSET_UCS_2 =  95,
+ 	    TDS_CHARSET_UCS_2_INTERNAL =  87,
+ 	     TDS_CHARSET_UCS_2_SWAPPED =  88,
+ 	             TDS_CHARSET_UCS_4 =  89,

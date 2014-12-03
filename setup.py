@@ -194,7 +194,7 @@ else:
     and compiling it yourself.
             """)
 
-    if FREETDS and osp.exists(FREETDS) and os.getenv('PYMSSQL_BUILD_WITH_BUNDLED_FREETDS'):
+    if FREETDS and osp.exists(FREETDS):
         print('setup.py: Using bundled FreeTDS in %s' % FREETDS)
         include_dirs.append(osp.join(FREETDS, 'include'))
         library_dirs.append(osp.join(FREETDS, 'lib'))
