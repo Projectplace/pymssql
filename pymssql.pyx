@@ -31,8 +31,7 @@ cdef extern from "pymssql_version.h":
     const char *PYMSSQL_VERSION
 
 __author__ = 'Damien Churchill <damoxc@gmail.com>'
-__full_version__ = PYMSSQL_VERSION.decode('ascii')
-__version__ = '.'.join(__full_version__.split('.')[:3]) # drop '.dev' from 'X.Y.Z.dev'
+__version__ = PYMSSQL_VERSION.decode('ascii')
 
 # Strives for compliance with DB-API 2.0 (PEP 249)
 # http://www.python.org/dev/peps/pep-0249/
