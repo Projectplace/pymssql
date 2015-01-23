@@ -195,11 +195,7 @@ def set_wait_callback(a_callable):
 DEF NUMERIC_BUF_SZ = 45
 
 cdef bytes ensure_bytes(s, encoding='utf-8'):
-    try:
-        decoded = s.decode(encoding)
-        return decoded.encode(encoding)
-    except AttributeError:
-        return s.encode(encoding)
+    return unicode(s).encode(encoding)
 
 cdef void log(char * message, ...):
     if PYMSSQL_DEBUG == 1:
