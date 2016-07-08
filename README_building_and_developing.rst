@@ -7,13 +7,20 @@ Building
 
 To build pymssql you should have:
 
-* python >= 2.6 including development files. Please research your OS usual
+* python >= 2.7 including development files. Please research your OS usual
   software distribution channels, e.g, ``python-dev`` or ``python-devel``
   packages.
 * Cython >= 0.15
 * FreeTDS >= 0.91 including development files. Please research your OS usual
   software distribution channels, e.g, ``freetds-dev`` or ``freetds-devel``
   packages.
+
+.. note::
+    If you need to connect to Azure:
+
+    * Use FreeTDS 0.91 or newer
+    * Make sure FreeTDS is built with SSL support. Instructions on how to do
+      this are out of the scope of this document.
 
 Windows
 -------

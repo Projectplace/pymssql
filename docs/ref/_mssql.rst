@@ -91,17 +91,40 @@ Functions
         SET TEXTSIZE 2147483647; -- http://msdn.microsoft.com/en-us/library/aa259190%28v=sql.80%29.aspx
 
     .. versionadded:: 2.1.1
-        The *conn_properties* argument.
+        The *conn_properties* parameter.
 
     .. versionchanged:: 2.1.1
         Before 2.1.1, the initialization queries now specified by
         *conn_properties* wasn't customizable and its value was hard-coded to
         the literal shown above.
 
-    .. note:: If you need to connect to Azure make sure you use FreeTDS 0.91 or newer.
+    .. note::
+        If you need to connect to Azure:
+
+        * Use FreeTDS 0.91 or newer
+        * Use TDS 7.1 or newer
+        * Make sure FreeTDS is built with SSL support
+        * Specify the database name you are connecting to in the *database* parameter
+        * Specify the username in *username@servername* form
 
     .. versionadded:: 2.1.1
         The ability to connect to Azure.
+
+    .. warning::
+        The *tds_version* parameter, added in version 2.0.0, has a default value
+        of '7.1'.
+
+        This will change with pymssql 2.2.0 when
+
+        * The default value will be changed to None
+        * The version of the TDS protocol to use by default won't be 7.1 anymore
+        * You won't able to rely on such default value anymore and will need to
+          either
+
+          * Specify its value explicitly or
+          * Configure it using facilities provided by FreeTDS (see `here
+            <http://www.freetds.org/userguide/freetdsconf.htm#TAB.FREETDS.CONF>`_
+            `and here <http://www.freetds.org/userguide/envvar.htm>`_)
 
 ``MSSQLConnection`` object properties
 -------------------------------------
@@ -146,12 +169,15 @@ Functions
 .. attribute:: MSSQLConnection.tds_version
 
    The TDS version used by this connection. Can be one of ``4.2``, ``5.0``
-   ``7.0``, ``8.0`` and ``7.2``.
+   ``7.0``, ``8.0``, ``7.2`` and ``7.3``.
 
    .. warning::
       For historical and backward compatibility reasons, the value used to
       represent TDS 7.1 is ``8.0``. This will change with pymssql 2.2.0 when it
       will be fixed to be ``7.1`` for correctness and consistency.
+
+   .. versionchanged:: 2.1.3
+      ``7.3`` was added as a possible value.
 
 ``MSSQLConnection`` object methods
 ----------------------------------
@@ -320,7 +346,7 @@ Functions
    This method binds a parameter to the stored procedure. *value* and *dbtype*
    are mandatory arguments, the rest is optional.
 
-   :param value: Is the value to store in the parameter
+   :param value: Is the value to store in the parameter.
 
    :param dbtype: Is one of: ``SQLBINARY``, ``SQLBIT``, ``SQLBITN``,
                   ``SQLCHAR``, ``SQLDATETIME``, ``SQLDATETIM4``,
@@ -328,17 +354,17 @@ Functions
                   ``SQLFLTN``, ``SQLIMAGE``, ``SQLINT1``, ``SQLINT2``,
                   ``SQLINT4``, ``SQLINT8``, ``SQLINTN``, ``SQLMONEY``,
                   ``SQLMONEY4``, ``SQLMONEYN``, ``SQLNUMERIC``, ``SQLREAL``,
-                  ``SQLTEXT``, ``SQLVARBINARY``, ``SQLVARCHAR``, ``SQLUUID``
+                  ``SQLTEXT``, ``SQLVARBINARY``, ``SQLVARCHAR``, ``SQLUUID``.
 
-   :param name: Is the name of the parameter
+   :param name: Is the name of the parameter. Needs to be in ``"@name"`` form.
 
-   :param output: Is the direction of the parameter: ``True`` indicates that it
-                   is also an output parameter that returns value after
-                   procedure execution
+   :param output: Is the direction of the parameter. ``True`` indicates that it
+                  is an output parameter i.e. it returns a value after procedure
+                  execution (in SQL DDL they are declared by using the
+                  ``"output"`` suffix, e.g. ``"@aname varchar(10) output"``).
 
-   :param null: TBD
-
-   .. todo:: Document ``null`` ``MSSQLStoredProcedure.bind()`` argument.
+   :param null: Boolean. Signals than NULL must be the value to be bound to the
+                argument of this input parameter.
 
    :param max_length: Is the maximum data length for this parameter to be
                       returned from the stored procedure.

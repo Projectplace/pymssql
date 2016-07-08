@@ -4,21 +4,20 @@
 #
 # Copyright (C) 2009 Damien Churchill <damoxc@gmail.com>
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 3, or (at your option)
-# any later version.
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
 #
-# This program is distributed in the hope that it will be useful,
+# This library is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.    See the
-# GNU General Public License for more details.
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.    If not, write to:
-#   The Free Software Foundation, Inc.,
-#   51 Franklin Street, Fifth Floor
-#   Boston, MA    02110-1301, USA.
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# MA  02110-1301  USA
 #
 
 import contextlib
@@ -59,6 +58,8 @@ else:
 
 from setuptools.command.test import test as TestCommand
 
+LINK_FREETDS_STATICALLY = True
+LINK_OPENSSL = False
 
 ROOT = osp.abspath(osp.dirname(__file__))
 
@@ -281,21 +282,48 @@ class build_ext(_build_ext):
                 ]
             else:
                 # Assume compiler is Visual Studio
-                if sys.version_info >= (3, 3):
+                if sys.version_info >= (3, 5):
+                    freetds_dir = 'vs2015'
+                elif sys.version_info >= (3, 3):
                     freetds_dir = 'vs2010'
                 else:
                     freetds_dir = 'vs2008'
-                libraries = [
-                    'db-lib', 'tds',
-                    'ws2_32', 'wsock32', 'kernel32', 'shell32',
-                ]
+                if LINK_FREETDS_STATICALLY:
+                    libraries = [
+                        'db-lib', 'tds', 'replacements',
+                        'iconv',
+                        'ws2_32', 'wsock32', 'kernel32', 'shell32',
+                    ]
+                    if LINK_OPENSSL:
+                        libraries.extend([
+                            'libeay{}MD'.format(BITNESS),
+                            'ssleay{}MD'.format(BITNESS)
+                        ])
+                else:
+                    libraries = [
+                        'ct', 'sybdb',
+                        'ws2_32', 'wsock32', 'kernel32', 'shell32',
+                    ]
+                    if LINK_OPENSSL:
+                        libraries.extend(['libeay32MD', 'ssleay32MD'])
 
             FREETDS = fpath('freetds', '{0}_{1}'.format(freetds_dir, BITNESS))
+            suffix = '' if BITNESS == 32 else '64'
+            OPENSSL = fpath('openssl', 'lib{}'.format(suffix))
             for e in self.extensions:
                 e.extra_compile_args.extend(extra_cc_args)
                 e.libraries.extend(libraries)
                 e.include_dirs.append(osp.join(FREETDS, 'include'))
-                e.library_dirs.append(osp.join(FREETDS, 'lib'))
+                if LINK_OPENSSL:
+                    freetds_lib_dir = 'lib'
+                else:
+                    freetds_lib_dir = 'lib-nossl'
+                if LINK_FREETDS_STATICALLY:
+                    e.library_dirs.append(osp.join(FREETDS, freetds_lib_dir, 'static'))
+                else:
+                    e.library_dirs.append(osp.join(FREETDS, freetds_lib_dir))
+                if LINK_OPENSSL:
+                    e.library_dirs.append(OPENSSL)
 
         else:
             for e in self.extensions:
@@ -413,7 +441,7 @@ setup(
     long_description = open('README.rst').read() +"\n\n" + open('ChangeLog_highlights.rst').read(),
     author = 'Damien Churchill',
     author_email = 'damoxc@gmail.com',
-    maintainer = 'pymssql Google Group',
+    maintainer = 'pymssql development team',
     maintainer_email = 'pymssql@googlegroups.com',
     license = 'LGPL',
     platforms = 'any',
@@ -430,12 +458,11 @@ setup(
       "Intended Audience :: Developers",
       "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
       "Programming Language :: Python",
-      "Programming Language :: Python :: 2.6",
       "Programming Language :: Python :: 2.7",
       "Programming Language :: Python :: 3",
-      "Programming Language :: Python :: 3.2",
       "Programming Language :: Python :: 3.3",
       "Programming Language :: Python :: 3.4",
+      "Programming Language :: Python :: 3.5",
       "Programming Language :: Python :: Implementation :: CPython",
       "Topic :: Database",
       "Topic :: Database :: Database Engines/Servers",

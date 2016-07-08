@@ -1,6 +1,83 @@
 Recent Changes
 ==============
 
+Version 2.1.3 - 2016-06-22 - Ramiro Morales
+===========================================
+
+- We now publish Linux PEP 513 manylinux wheels on PyPI.
+- Windows official binaries: Rollback changes to Windows binaries we had
+  implemented in pymssql 2.1.2; go back to using:
+
+  * A statically linked version of FreeTDS (v0.95.95)
+  * No SSL support
+
+Version 2.1.2 - 2016-02-10 - Ramiro Morales
+===============================================
+
+.. attention:: Windows users: You need to download and install additional DLLs
+
+    pymssql version 2.1.2 includes a change in the official Windows binaries:
+    FreeTDS isn't statically linked as it happened up to release 2.1.1, as that
+    FreeTDS copy lacked SSL support.
+
+    Please see http://pymssql.org/en/latest/freetds.html#windows for futher
+    details.
+
+    We are trying to find a balance between security and convenience and will
+    be evaluating the situation for future releases. Your feedback is greatly
+    welcome.
+
+Features
+--------
+
+- Add ability to set TDS protocol version from pymssql when connecting to SQL
+  Server. For the remaining pymssql 2.1.x releases its default value will be 7.1
+  (GH-323)
+
+- Add Dockerfile and a Docker image and instructions on how to use it (GH-258).
+  This could be a convenient way to use pymssql without having to build stuff.
+  See http://pymssql.readthedocs.org/en/latest/intro.html#docker
+  Thanks Marc Abramowitz.
+
+- Floating point values are now accepted as Stored Procedure arguments
+  (GH-287). Thanks Runzhou Li (Leo) for the report and Bill Adams for the
+  implementation.
+
+- Send pymssql version in the appname TDS protocol login record field when the
+  application doesn't provide one (GH-354)
+
+Bug fixes
+---------
+
+- Fix a couple of very common causes of segmentation faults in presence of
+  network a partition between a pymssql-based app and SQL Server (GH-147,
+  GH-271) Thanks Marc Abramowitz. See also GH-373.
+
+- Fix failures and inconsistencies in query parameter interpolation when
+  UTF-8-encoded literals are present (GH-185). Thanks Bill Adams. Also, GH-291.
+
+- Fix ``login_timeout`` parameter of ``pymssql.connect()`` (GH-318)
+
+- Fixed some cases of ``cursor.rowcont`` having a -1 value after iterating
+  over the value returned by pymssql cursor ``fetchmany()`` and ``fetchone()``
+  methods (GH-141)
+
+- Remove automatic treatment of string literals passed in queries that start
+  with ``'0x'`` as hexadecimal values (GH-286)
+
+- Fix build fatal error when using Cython >= 0.22 (GH-311)
+
+Internals
+---------
+
+- Add Appveyor hosted CI setup for running tests on Windows (GH-347)
+
+- Travis CI: Use newer, faster, container-based infrastructure. Also, test
+  against more than one FreeTDS version.
+
+- Make it possible to build official release files (sdist, wheels) on Travis &
+  AppVeyor.
+
 Version 2.1.1 - 2014-11-25 - Ramiro Morales
 ===========================================
 

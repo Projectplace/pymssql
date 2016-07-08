@@ -31,7 +31,8 @@ cdef extern from "pymssql_version.h":
     const char *PYMSSQL_VERSION
 
 __author__ = 'Damien Churchill <damoxc@gmail.com>'
-__version__ = PYMSSQL_VERSION.decode('ascii')
+__full_version__ = PYMSSQL_VERSION.decode('ascii')
+__version__ = '.'.join(__full_version__.split('.')[:3]) # drop '.dev' from 'X.Y.Z.dev'
 
 # Strives for compliance with DB-API 2.0 (PEP 249)
 # http://www.python.org/dev/peps/pep-0249/
@@ -102,6 +103,7 @@ cdef dict DBTYPES = {
     'Decimal': _mssql.SQLDECIMAL,
     'datetime': _mssql.SQLDATETIME,
     'date': _mssql.SQLDATETIME,
+    'float': _mssql.SQLFLT8,
     #Dump type for work vith None
     'NoneType': _mssql.SQLVARCHAR,
 }
@@ -118,6 +120,7 @@ cdef int py2db_type(py_type, value):
             return _mssql.SQLINTN
         if py_type == 'long':
             return _mssql.SQLINT8
+
     return DBTYPES[py_type]
 
 try:
@@ -504,8 +507,8 @@ cdef class Cursor:
 
         try:
             return self.getrow()
-
         except StopIteration:
+            self._rownumber = self._source._conn.rows_affected
             return None
         except _mssql.MSSQLDatabaseException, e:
             raise OperationalError, e.args[0]
@@ -526,6 +529,7 @@ cdef class Cursor:
                 try:
                     rows.append(self.getrow())
                 except StopIteration:
+                    self._rownumber = self._source._conn.rows_affected
                     break
             return rows
         except _mssql.MSSQLDatabaseException, e:
@@ -576,7 +580,7 @@ cdef class Cursor:
 
 def connect(server='.', user='', password='', database='', timeout=0,
         login_timeout=60, charset='UTF-8', as_dict=False,
-        host='', appname=None, port='1433', conn_properties=None, autocommit=False):
+        host='', appname=None, port='1433', conn_properties=None, autocommit=False, tds_version='7.1'):
     """
     Constructor for creating a connection to the database. Returns a
     Connection object.
@@ -604,17 +608,19 @@ def connect(server='.', user='', password='', database='', timeout=0,
     :keyword conn_properties: SQL queries to send to the server upon connection
                               establishment. Can be a string or another kind
                               of iterable of strings
-    :keyword autocommit whether to use default autocommiting mode or not
+    :keyword autocommit: Whether to use default autocommiting mode or not
     :type autocommit: boolean
+    :keyword tds_version: TDS protocol version to use.
+    :type tds_version: string
     """
-
-    _mssql.login_timeout = login_timeout
 
     # set the login timeout
     try:
         login_timeout = int(login_timeout)
     except ValueError:
         login_timeout = 0
+
+    _mssql.login_timeout = login_timeout
 
     # default query timeout
     try:
@@ -628,7 +634,7 @@ def connect(server='.', user='', password='', database='', timeout=0,
     try:
         conn = _mssql.connect(server=server, user=user, password=password,
                               charset=charset, database=database,
-                              appname=appname, port=port,
+                              appname=appname, port=port, tds_version=tds_version,
                               conn_properties=conn_properties)
 
     except _mssql.MSSQLDatabaseException, e:

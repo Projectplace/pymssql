@@ -29,46 +29,86 @@ Functions
 .. function:: connect(server='.', user='', password='', database='', \
                       timeout=0, login_timeout=60, charset='UTF-8', \
                       as_dict=False, host='', appname=None, port='1433',\
-                      conn_properties)
+                      conn_properties, autocommit=False, tds_version='7.1')
 
-    Constructor for creating a connection to the database. Returns a
-    :class:`Connection` object.
+   Constructor for creating a connection to the database. Returns a
+   :class:`Connection` object.
 
-    :param server: database host
-    :type server: string
-    :param user: database user to connect as
-    :type user: string
-    :param password: user's password
-    :type password: string
-    :param database: the database to initially connect to
-    :type database: string
-    :param timeout: query timeout in seconds, default 0 (no timeout)
-    :type timeout: int
-    :param login_timeout: timeout for connection and login in seconds, default 60
-    :type login_timeout: int
-    :param charset: character set with which to connect to the database
-    :type charset: string
-    :keyword as_dict: whether rows should be returned as dictionaries instead of tuples
-    :type as_dict: boolean
-    :keyword appname: Set the application name to use for the connection
-    :type appname: string
-    :keyword port: the TCP port to use to connect to the server
-    :type port: string
-    :keyword conn_properties: SQL queries to send to the server upon connection
-                              establishment. Can be a string or another kind
-                              of iterable of strings. Default value: See
-                              :class:`_mssql.connect <_mssql.MSSQLConnection>`
+   :param str server: database host
+   :param str user: database user to connect as
+   :param str password: user's password
+   :param str database: the database to initially connect to
+   :param int timeout: query timeout in seconds, default 0 (no timeout)
+   :param int login_timeout: timeout for connection and login in seconds, default 60
+   :param str charset: character set with which to connect to the database
+   :keyword conn_properties: SQL queries to send to the server upon connection
+                             establishment. Can be a string or another kind of
+                             iterable of strings.  Default value: See
+                             :class:`_mssql.connect() <_mssql.MSSQLConnection>`
+   :keyword bool as_dict: whether rows should be returned as dictionaries instead of tuples
+   :keyword str appname: Set the application name to use for the connection
+   :keyword str port: the TCP port to use to connect to the server
+   :keyword bool autocommit: Whether to use default autocommiting mode or not
+   :keyword str tds_version: TDS protocol version to use.
 
-    .. note::
-        If you need to connect to Azure make sure you:
-        * Use FreeTDS 0.91 or newer.
-        * Specify the database name you are connecting to in the ``connect()`` call.
+   .. warning::
+       Currently, setting *timeout* or *login_timeout* has a process-wide
+       effect because the FreeTDS db-lib API functions used to implement such
+       timeouts have a global effect.
 
-    .. versionadded:: 2.1.1
-        The ability to connect to Azure.
+   .. note::
+       If you need to connect to Azure:
 
-    .. versionadded:: 2.1.1
-        The *conn_properties* argument.
+       * Use FreeTDS 0.91 or newer
+       * Use TDS 7.1 or newer
+       * Make sure FreeTDS is built with SSL support
+       * Specify the database name you are connecting to in the ``connect()`` call
+       * Specify the username in *username@servername* form in the ``connect()`` call
+
+       Example::
+
+           pymssql.connect("xxx.database.windows.net", "username@xxx.database.windows.net", "password", "db_name")
+
+       or::
+
+           pymssql.connect("myalias", "username@xxx.database.windows.net", "password", "db_name")
+
+       if you've defined ``myalias`` in the ``freetds.conf`` FreeTDS config file::
+
+           [myalias]
+           host = xxx.database.windows.net
+           tds version = 7.1
+           ...
+
+   .. versionadded:: 2.1.1
+       The ability to connect to Azure.
+
+   .. versionadded:: 2.1.1
+       The *conn_properties* parameter.
+
+   .. versionadded:: 2.1.1
+       The *autocommit* parameter.
+
+   .. versionadded:: 2.1.2
+       The *tds_version* parameter.
+
+   .. warning::
+     The *tds_version* parameter, new in version 2.1.2, has a default value of
+     '7.1'. This is for consistency with the default value of the equally-named
+     parameter of the :class:`_mssql.connect() <_mssql.MSSQLConnection>`
+     function.
+
+     This will change with pymssql 2.2.0 when
+
+     * The default value will be changed to None
+     * The version of the TDS protocol to use by default won't be 7.1 anymore
+     * You won't able to rely on such default value anymore and will need to
+       either
+
+       * Specify its value explicitly or
+       * Configure it using facilities provided by FreeTDS (see `here
+         <http://www.freetds.org/userguide/freetdsconf.htm#TAB.FREETDS.CONF>`_
+         `and here <http://www.freetds.org/userguide/envvar.htm>`_)
 
 .. function:: get_dbversion()
 
@@ -247,14 +287,18 @@ Cusor object methods
             Cursor.execute(operation, params)
 
     *operation* is a string and *params*, if specified, is a simple value, a
-    tuple, or ``None``.
+    tuple, a dict, or ``None``.
 
     Performs the operation against the database, possibly replacing parameter
     placeholders with provided values. This should be preferred method of
     creating SQL commands, instead of concatenating strings manually, what makes
-    a potential of `SQL Injection attacks`_. This method accepts the same
-    formatting as Python's builtin :ref:`string interpolation operator
-    <python:string-formatting>`.
+    a potential of `SQL Injection attacks`_. This method accepts formatting similar
+    to Python's builtin :ref:`string interpolation operator
+    <python:string-formatting>`. However, since formatting and type conversion is handled
+    internally, only the ``%s`` and ``%d`` placeholders are supported. Both placeholders are
+    functionally equivalent.
+
+    Keyed placeholders are supported if you provide a dict for *params*.
 
     If you call ``execute()`` with one argument, the ``%`` sign loses its
     special meaning, so you can use it as usual in your query string, for
@@ -318,6 +362,80 @@ Cusor object methods
 
    These methods do nothing, as permitted by DB-API specs.
 
-.. todo:: Document all ``pymssql`` PEP 249-mandated exceptions.
+Exceptions
+==========
+
+.. exception:: StandardError
+
+    Root of the exception hierarchy.
+
+.. exception:: Warning
+
+    Raised for important warnings like data truncations while inserting, etc. A
+    subclass of :exc:`StandardError`.
+
+.. exception:: Error
+
+    Base class of all other error exceptions. You can use this to catch all
+    errors with one single except statement. A subclass of :exc:`StandardError`.
+
+.. exception:: InterfaceError
+
+    Raised for errors that are related to the database interface rather than the
+    database itself. A subclass of :exc:`Error`.
+
+.. exception:: DatabaseError
+
+    Raised for errors that are related to the database. A subclass of
+    :exc:`Error`.
+
+.. exception:: DataError
+
+    Raised for errors that are due to problems with the processed data like
+    division by zero, numeric value out of range, etc. A subclass of
+    :exc:`DatabaseError`.
+
+.. exception:: OperationalError
+
+    Raised for errors that are related to the database's operation and not
+    necessarily under the control of the programmer, e.g. an unexpected
+    disconnect occurs, the data source name is not found, a transaction could
+    not be processed, a memory allocation error occurred during processing, etc.
+    A subclass of :exc:`DatabaseError`.
+
+.. exception:: IntegrityError
+
+    Raised when the relational integrity of the database is affected, e.g. a
+    foreign key check fails. A subclass of :exc:`DatabaseError`.
+
+.. exception:: InternalError
+
+    Raised when the database encounters an internal error, e.g. the cursor is
+    not valid anymore, the transaction is out of sync, etc. A subclass of
+    :exc:`DatabaseError`.
+
+.. exception:: ProgrammingError
+
+    Raised for programming errors, e.g. table not found or already exists,
+    syntax error in the SQL statement, wrong number of parameters specified,
+    etc. A subclass of :exc:`DatabaseError`.
+
+.. exception:: NotSupportedError
+
+    Raised in case a method or database API was used which is not supported by
+    the database, e.g. requesting a :meth:`~Connection.rollback()` on a
+    connection that does not support transaction or has transactions turned off.
+    A subclass of :exc:`DatabaseError`.
+
+.. exception:: ColumnsWithoutNamesError
+
+    Raised by :meth:`Cursor.execute` when ``as_dict=True`` has been specified
+    to :func:`open <connect>` the :class:`connection <Connection>` and the
+    query sent to the server doesn't involve columns names in its results.
+    A subclass of :exc:`InterfaceError`.
+
+    .. note::
+        ``ColumnsWithoutNamesError`` isn't a PEP-249-mandated exception but
+        rather a pymssql extension.
 
 .. _SQL Injection attacks: http://en.wikipedia.org/wiki/SQL_injection

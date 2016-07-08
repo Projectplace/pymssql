@@ -94,7 +94,8 @@ cdef int MAX_INT = 2147483647
 cdef int MIN_INT = -2147483648
 
 # Store the module version
-__version__ = PYMSSQL_VERSION.decode('ascii')
+__full_version__ = PYMSSQL_VERSION.decode('ascii')
+__version__ = '.'.join(__full_version__.split('.')[:3]) # drop '.dev' from 'X.Y.Z.dev'
 
 #############################
 ## DB-API type definitions ##
@@ -485,7 +486,7 @@ cdef class MSSQLConnection:
             if val < 0:
                 raise ValueError("The 'query_timeout' attribute must be >= 0.")
 
-            # currently this will set it application wide :-(
+            # XXX: Currently this will set it application wide :-(
             rtc = dbsettime(val)
             check_and_raise(rtc, self)
 
@@ -507,7 +508,9 @@ cdef class MSSQLConnection:
         """
         def __get__(self):
             cdef int version = dbtds(self.dbproc)
-            if version == 10:
+            if version == 11:
+                return 7.3
+            elif version == 10:
                 return 7.2
             elif version == 9:
                 return 8.0  # Actually 7.1, return 8.0 to keep backward compatibility
@@ -554,7 +557,7 @@ cdef class MSSQLConnection:
         if login == NULL:
             raise MSSQLDriverException("dblogin() failed")
 
-        appname = appname or "pymssql"
+        appname = appname or "pymssql=%s" % __full_version__
 
         # For Python 3, we need to convert unicode to byte strings
         cdef bytes user_bytes = user.encode('utf-8')
@@ -611,6 +614,7 @@ cdef class MSSQLConnection:
                 log("_mssql.MSSQLConnection.__init__(): Warning: This version of FreeTDS doesn't support selecting the DB name when setting up the connection. This will keep connections to Azure from working.")
 
         # Set the login timeout
+        # XXX: Currently this will set it application wide :-(
         dbsetlogintime(login_timeout)
 
         cdef bytes server_bytes = server.encode('utf-8')
@@ -821,10 +825,11 @@ cdef class MSSQLConnection:
             return (<char *>data)[:length]
 
     cdef int convert_python_value(self, object value, BYTE **dbValue,
-            int *dbtype, int *length) except 1:
+            int *dbtype, int *length) except -1:
         log("_mssql.MSSQLConnection.convert_python_value()")
         cdef int *intValue
         cdef double *dblValue
+        cdef float *fltValue
         cdef PY_LONG_LONG *longValue
         cdef char *strValue
         cdef char *tmp
@@ -870,15 +875,17 @@ cdef class MSSQLConnection:
             dbValue[0] = <BYTE *>longValue
             return 0
 
-        if dbtype[0] in (SQLFLT4, SQLFLT8):
+        if dbtype[0] in (SQLFLT4, SQLREAL):
+            fltValue = <float *>PyMem_Malloc(sizeof(float))
+            fltValue[0] = <float>value
+            dbValue[0] = <BYTE *><DBREAL *>fltValue
+            return 0
+
+        if dbtype[0] == SQLFLT8:
             dblValue = <double *>PyMem_Malloc(sizeof(double))
             dblValue[0] = <double>value
-            if dbtype[0] == SQLFLT4:
-                dbValue[0] = <BYTE *><DBREAL *>dblValue
-                return 0
-            if dbtype[0] == SQLFLT8:
-                dbValue[0] = <BYTE *><DBFLT8 *>dblValue
-                return 0
+            dbValue[0] = <BYTE *><DBFLT8 *>dblValue
+            return 0
 
         if dbtype[0] in (SQLDATETIM4, SQLDATETIME):
             if type(value) not in (datetime.date, datetime.datetime):
@@ -1246,7 +1253,12 @@ cdef class MSSQLConnection:
             column_types = list()
 
             for col in xrange(1, self.num_columns + 1):
-                column_name = dbcolname(self.dbproc, col).decode(self._charset)
+                col_name = dbcolname(self.dbproc, col)
+                if not col_name:
+                    self.num_columns -= 1
+                    return None
+
+                column_name = col_name.decode(self._charset)
                 column_names.append(column_name)
                 coltype = dbcoltype(self.dbproc, col)
                 column_types.append(get_api_coltype(coltype))
@@ -1789,8 +1801,8 @@ cdef _quote_data(data, charset='utf8'):
 
     raise ValueError('expected a simple type, a tuple or a dictionary.')
 
-_re_pos_param = re.compile(r'(%(s|d))')
-_re_name_param = re.compile(r'(%\(([^\)]+)\)s)')
+_re_pos_param = re.compile(br'(%([sd]))')
+_re_name_param = re.compile(br'(%\(([^\)]+)\)(?:[sd]))')
 cdef _substitute_params(toformat, params, charset):
     if params is None:
         return toformat
@@ -1815,8 +1827,8 @@ cdef _substitute_params(toformat, params, charset):
     if isinstance(params, dict):
         """ assume name based substitutions """
         offset = 0
-        for match in _re_name_param.finditer(toformat.decode(charset)):
-            param_key = match.group(2)
+        for match in _re_name_param.finditer(toformat):
+            param_key = match.group(2).decode(charset)
 
             if not param_key in params:
                 raise ValueError('params dictionary did not contain value for placeholder: %s' % param_key)
@@ -1843,7 +1855,7 @@ cdef _substitute_params(toformat, params, charset):
     else:
         """ assume position based substitutions """
         offset = 0
-        for count, match in enumerate(_re_pos_param.finditer(toformat.decode(charset))):
+        for count, match in enumerate(_re_pos_param.finditer(toformat)):
             # calculate string positions so we can keep track of the offset to
             # be used in future substitutions on this string. This is
             # necessary b/c the match start() and end() are based on the

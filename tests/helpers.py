@@ -81,6 +81,8 @@ def get_app_lock():
 
 
 def release_app_lock():
+    if global_mssqlconn is None:
+        return
     t1 = time.time()
     result = global_mssqlconn.execute_scalar("""
     DECLARE @result INTEGER;
@@ -285,6 +287,24 @@ class CursorBase(DBAPIBase):
         cur.fetchall()
         eq_(cur.rowcount, 5)
 
+    def test_fetchone_rowcount(self):
+        cur = self.execute('select * from test')
+        eq_(cur.rowcount, -1)
+
+        for _ in iter(cur.fetchone, None):
+            eq_(cur.rowcount, -1)
+
+        eq_(cur.rowcount, 5)
+
+    def test_fetchmany_rowcount(self):
+        cur = self.execute('select * from test')
+        eq_(cur.rowcount, -1)
+
+        for _ in iter(cur.fetchmany, []):
+            eq_(cur.rowcount, -1)
+
+        eq_(cur.rowcount, 5)
+
     def test_as_dict(self):
         # test for http://code.google.com/p/pymssql/issues/detail?id=92
         cur = self.conn.cursor(as_dict=True)
@@ -451,3 +471,24 @@ class StoredProc(object):
 
     def __exit__(self, type, value, tb):
         self.drop()
+
+
+def get_sql_server_version(mssql_connection):
+    """
+    Returns the version of the SQL Server in use:
+    """
+    result = mssql_connection.execute_scalar(
+        "SELECT CAST(SERVERPROPERTY('ProductVersion') as varchar)"
+    )
+    ver_code = int(result.split('.')[0])
+    if ver_code >= 12:
+        major_version = 2014
+    if ver_code == 11:
+        major_version = 2012
+    elif ver_code == 10:
+        major_version = 2008
+    elif ver_code == 9:
+        major_version = 2005
+    else:
+        major_version = 2000
+    return major_version
